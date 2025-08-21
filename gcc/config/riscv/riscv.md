@@ -2471,7 +2471,8 @@
   "!ira_in_progress
    && !(p2m1_shift_operand (operands[1], <MODE>mode)
 	|| high_mask_shift_operand (operands[1], <MODE>mode)
-	|| exact_log2 (INTVAL (operands[1])) >= 0)"
+	|| exact_log2 (INTVAL (operands[1])) >= 0
+	|| (TARGET_ZCLLI && riscv_zclli_const_operand_p (operands[1], <MODE>mode)))"
   "#"
   "&& 1"
   [(const_int 0)]

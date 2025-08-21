@@ -1319,4 +1319,7 @@ extern void riscv_remove_unneeded_save_restore_calls (void);
 
 #define TARGET_HAS_FMV_TARGET_ATTRIBUTE 0
 
+/* Helper function for the ZCLLI exntesion. */
+extern bool riscv_zclli_const_operand_p (rtx src, enum machine_mode mode);
+
 #endif /* ! GCC_RISCV_H */

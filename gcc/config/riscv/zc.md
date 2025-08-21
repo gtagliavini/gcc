@@ -1457,3 +1457,13 @@
   { return (REGNO (operands[1]) == A0_REGNUM) ? "cm.mvsa01\t%0,%2" : "cm.mvsa01\t%2,%0"; }
   [(set_attr "mode" "<X:MODE>")
    (set_attr "type" "mvpair")])
+
+;; 48-bit CL.LI operation (ZCLLI extension)
+(define_insn "clli_<GPR:mode>"
+  [(set (match_operand:GPR 0 "register_operand" "=r")
+        (match_operand:GPR 1 "zclli_imm_operand" "i"))]
+  "TARGET_ZCLLI"
+  "cl.li\t%0,%1"
+  [(set_attr "type" "const")
+   (set_attr "mode" "<GPR:MODE>")
+   (set_attr "length" "6")])

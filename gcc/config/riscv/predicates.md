@@ -685,3 +685,9 @@
   (and (match_operand 0 "register_operand")
        (match_test "REGNO (op) == RETURN_ADDR_REGNUM
 		    || REGNO (op) == T0_REGNUM")))
+
+;; Immediate value used by for the ZCLLI extension
+(define_predicate "zclli_imm_operand"
+  (and (match_code "const_int")
+       (match_test "TARGET_ZCLLI && riscv_zclli_const_operand_p (op, mode)")))
+

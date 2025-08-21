@@ -827,6 +827,73 @@ riscv_parse_tune (const char *tune_string, bool null_p)
   return riscv_tune_info_table;
 }
 
+/* Helper functions for the ZCLLI extension. */
+
+static bool
+riscv_const_via_clui_addi_p (HOST_WIDE_INT val)
+{
+  /* Compressed base arithmetic must be available */
+  if (!TARGET_ZCA)
+    return false;
+
+  /* Choose q so that r = val - (q<<12) is in [-2048, 2047].  */
+  HOST_WIDE_INT q = val >> 12;
+  HOST_WIDE_INT base = q << 12;
+  HOST_WIDE_INT r = val - base;
+
+  /*  */
+  if (r < -2048)
+    {
+      q--;
+      r += 4096;
+    }
+  else if (r > 2047)
+    {
+      q++;
+      r -= 4096;
+    }
+
+  /* q must be a non-zero 6-bit signed value for C.LUI. */
+  if (q == 0 || q < -32 || q > 31)
+    return false;
+
+  return true;
+}
+
+static bool
+riscv_zclli_encodable_p (HOST_WIDE_INT val)
+{
+  /* Can we materialize the constant with C.LUI+(C.)ADDI?
+     In that case, it is not profitable to use CL.LI. */
+  if (riscv_const_via_clui_addi_p (val))
+    return false;
+
+  /* The value must fit a 32 bit immediate field. */
+  return val == (HOST_WIDE_INT)(int32_t)val;
+}
+
+bool
+riscv_zclli_const_operand_p (rtx src, machine_mode mode)
+{
+  /* Prelimiary check. */
+  if (!CONST_INT_P (src))
+    return false;
+
+  /* Check if it is possible (and profitable) to use te ZCLLI extension */
+  HOST_WIDE_INT val = trunc_int_for_mode (INTVAL (src), mode);
+  return riscv_zclli_encodable_p (val);
+}
+
+static rtx
+riscv_emit_zclli_from_rtx (rtx target, rtx val, machine_mode mode)
+{
+  if (mode == SImode)
+    emit_insn (gen_clli_si (target, val));
+  else
+    emit_insn (gen_clli_di (target, val));
+  return target;
+}
+
 /* Helper function for riscv_build_integer; arguments are as for
    riscv_build_integer.  */
 
@@ -866,6 +933,15 @@ riscv_build_integer_1 (struct riscv_integer_op codes[RISCV_MAX_INTEGER_OPS],
       if (TARGET_64BIT && mode == SImode && value == (HOST_WIDE_INT_1U << 31))
 	codes[0].value = (HOST_WIDE_INT_M1U << 31);
 
+      return 1;
+    }
+  if (TARGET_ZCLLI && riscv_zclli_encodable_p (value))
+    {
+      /* Simply CL.LI  */
+      codes[0].code = UNKNOWN;
+      codes[0].value = value;
+      codes[0].use_uw = false;
+      codes[0].save_temporary = false;
       return 1;
     }
 
@@ -3508,6 +3584,19 @@ riscv_legitimize_subreg_const_poly_move (machine_mode mode, rtx dest, rtx src)
 bool
 riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
 {
+  /* If ZCLLI is supported, we could emit a single instruction to materialize
+     constants. */
+  if (TARGET_ZCLLI
+      && REG_P (dest)
+      && riscv_zclli_const_operand_p (src, mode))
+    {
+      if ((reload_completed || can_create_pseudo_p ()))
+        {
+          riscv_emit_zclli_from_rtx (dest, src, mode);
+          return true;
+        }
+    }
+
   if (CONST_POLY_INT_P (src))
     {
       /*
