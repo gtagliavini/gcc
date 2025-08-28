@@ -14354,3 +14354,10 @@ proc check_effective_target_speculation_barrier_defined { } {
 	    }
 	}]
 }
+
+# Return true if the compiler accepts -march=rv32gc_zclli
+proc check_effective_target_riscv_zclli { } {
+    return [check_no_compiler_messages riscv_zclli object {
+	int x;
+    } "-march=rv32gc_zclli -mabi=ilp32"]
+}
